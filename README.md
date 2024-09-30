@@ -1,6 +1,18 @@
 # Wi-Fi Jammer Script
 
-![image](https://github.com/user-attachments/assets/8626b017-2924-4904-a3e8-7c820848a75a)
+ooooo      ooo               .           ooooo      ooo  o8o                  o8o           
+`888b.     `8'             .o8           `888b.     `8'  `"'                  `"'           
+ 8 `88b.    8   .ooooo.  .o888oo          8 `88b.    8  oooo  ooo. .oo.      oooo  .oooo.   
+ 8   `88b.  8  d88' `88b   888            8   `88b.  8  `888  `888P"Y88b     `888 `P  )88b  
+ 8     `88b.8  888ooo888   888   8888888  8     `88b.8   888   888   888      888  .oP"888  
+ 8       `888  888    .o   888 .          8       `888   888   888   888      888 d8(  888  
+o8o        `8  `Y8bod8P'   "888"         o8o        `8  o888o o888o o888o     888 `Y888""8o 
+                                                                              888           
+                                                                          .o. 88P           
+                                                                          `Y888P            
+    
+                                                                                   By: Mohit Pimoli
+                                                                                   Version: 1.1
 
 This script allows you to perform a deauthentication attack on Wi-Fi networks, effectively disconnecting clients from a targeted network.
 
