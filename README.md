@@ -1,5 +1,7 @@
 # Wi-Fi Jammer Script
 
+![image](https://github.com/user-attachments/assets/8626b017-2924-4904-a3e8-7c820848a75a)
+
 This script allows you to perform a deauthentication attack on Wi-Fi networks, effectively disconnecting clients from a targeted network.
 
 ---
@@ -22,8 +24,8 @@ This tool is for educational purposes only. Unauthorized use of this script can 
 ### Install necessary tools:
 
 ```bash
-    sudo apt update
-    sudo apt install aircrack-ng
+sudo apt update
+sudo apt install aircrack-ng
 ```
 
 ---
