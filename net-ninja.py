@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 import subprocess
 import re
@@ -10,19 +9,16 @@ from datetime import datetime
 import signal
 import sys
 
-# Create an empty list
+
 active_wireless_networks = []
 
 
 def check_for_essid(essid, lst):
     check_status = True
-    # If no ESSIDs in list add the row
     if len(lst) == 0:
         return check_status
 
-    # This will only run if there are wireless access points in the list.
     for item in lst:
-        # If True don't add to list. False will add it to list
         if essid in item["ESSID"]:
             check_status = False
 
@@ -105,7 +101,6 @@ subprocess.run(["sudo", "ip", "link", "set", hacknic, "up"])
 print("\nThis will take few seconds...\n")
 time.sleep(15)
 
-# Discover access points
 discover_access_points = subprocess.Popen(
     [
         "sudo",

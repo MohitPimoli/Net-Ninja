@@ -1,4 +1,18 @@
-# Wi-Fi Jammer Script
+```bash
+ooooo      ooo               .           ooooo      ooo  o8o                  o8o
+`888b.     `8'             .o8           `888b.     `8'  `"'                  `"'
+ 8 `88b.    8   .ooooo.  .o888oo          8 `88b.    8  oooo  ooo. .oo.      oooo  .oooo.
+ 8   `88b.  8  d88' `88b   888            8   `88b.  8  `888  `888P"Y88b     `888 `P  )88b
+ 8     `88b.8  888ooo888   888   8888888  8     `88b.8   888   888   888      888  .oP"888
+ 8       `888  888    .o   888 .          8       `888   888   888   888      888 d8(  888
+o8o        `8  `Y8bod8P'   "888"         o8o        `8  o888o o888o o888o     888 `Y888""8o
+                                                                              888
+                                                                          .o. 88P
+                                                                          `Y888P
+
+                                                                                   By: Mohit Pimoli
+                                                                                   Version: 1.1
+```
 
 This script allows you to perform a deauthentication attack on Wi-Fi networks, effectively disconnecting clients from a targeted network.
 
@@ -22,8 +36,8 @@ This tool is for educational purposes only. Unauthorized use of this script can 
 ### Install necessary tools:
 
 ```bash
-    sudo apt update
-    sudo apt install aircrack-ng
+sudo apt update
+sudo apt install aircrack-ng
 ```
 
 ---
@@ -36,7 +50,7 @@ First, clone the repository to your local machine:
 
 ```bash
 git clone https://github.com/MohitPimoli/Net-Ninja.git
-cd wifi-jammer
+cd Net-Ninja
 ```
 
 ### 2. Run the Script
@@ -44,7 +58,7 @@ cd wifi-jammer
 Before running the script, ensure you have administrative privileges (use sudo):
 
 ```bash
-sudo python3 wifi_jammer.py
+sudo python3 net-ninja.py
 ```
 
 ### 3. Select the Wi-Fi Interface
