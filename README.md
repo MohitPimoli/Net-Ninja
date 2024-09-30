@@ -50,7 +50,7 @@ First, clone the repository to your local machine:
 
 ```bash
 git clone https://github.com/MohitPimoli/Net-Ninja.git
-cd wifi-jammer
+cd Net-Ninja
 ```
 
 ### 2. Run the Script
@@ -58,7 +58,7 @@ cd wifi-jammer
 Before running the script, ensure you have administrative privileges (use sudo):
 
 ```bash
-sudo python3 wifi_jammer.py
+sudo python3 net-ninja.py
 ```
 
 ### 3. Select the Wi-Fi Interface
