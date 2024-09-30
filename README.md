@@ -1,5 +1,6 @@
 # Wi-Fi Jammer Script
 
+```bash
 ooooo      ooo               .           ooooo      ooo  o8o                  o8o           
 `888b.     `8'             .o8           `888b.     `8'  `"'                  `"'           
  8 `88b.    8   .ooooo.  .o888oo          8 `88b.    8  oooo  ooo. .oo.      oooo  .oooo.   
@@ -13,6 +14,7 @@ o8o        `8  `Y8bod8P'   "888"         o8o        `8  o888o o888o o888o     88
     
                                                                                    By: Mohit Pimoli
                                                                                    Version: 1.1
+```
 
 This script allows you to perform a deauthentication attack on Wi-Fi networks, effectively disconnecting clients from a targeted network.
 
