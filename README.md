@@ -26,11 +26,10 @@ This tool is for educational purposes only. Unauthorized use of this script can 
 
 ## Requirements
 
-- A Linux system (preferably Kali Linux)
-- Python 3.x installed
-- `aircrack-ng` tools installed (`airodump-ng`, `aireplay-ng`, `airmon-ng`)
-- A Wi-Fi adapter that supports monitor mode
-
+- A Linux system (preferably Kali Linux).
+- Python 3.x installed.
+- `aircrack-ng` tools installed (`airodump-ng`, `aireplay-ng`, `airmon-ng`).
+- A Wi-Fi adapter that supports monitor mode and packet injection.
 ---
 
 ### Install necessary tools:
